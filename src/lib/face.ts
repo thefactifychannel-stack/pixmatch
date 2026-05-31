@@ -79,10 +79,10 @@ export function euclideanDistance(a: number[], b: number[]): number {
   return Math.sqrt(sum);
 }
 
-// face-api uses descriptors where distance < 0.6 is a typical match threshold.
-// Returns confidence in [0, 1], where 1 = perfect match.
+// face-api descriptors: distance < 0.6 is a confident match, < 0.4 is very strong.
+// Rescale so dist=0.3 → 1.0, dist=0.45 → ~0.6, dist=0.6 → 0.
 export function distanceToConfidence(dist: number): number {
-  return Math.max(0, Math.min(1, 1 - dist / 1.0));
+  return Math.max(0, Math.min(1, (0.6 - dist) / 0.3));
 }
 
 export async function loadImageFromBlob(
