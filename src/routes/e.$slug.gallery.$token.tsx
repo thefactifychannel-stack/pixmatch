@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Heart, Download, Share2, X, ArrowLeft } from "lucide-react";
+import { Heart, Download, Share2, X, ArrowLeft, AlertCircle, Camera, Lightbulb, RefreshCw } from "lucide-react";
 import { publicPhotoUrl } from "@/lib/storage-url";
 
 type Match = {
@@ -32,6 +32,7 @@ function GuestGallery() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<"best" | "all" | "favorites">("best");
   const [viewer, setViewer] = useState<string | null>(null);
+  const [totalEventPhotos, setTotalEventPhotos] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -42,6 +43,14 @@ function GuestGallery() {
         .maybeSingle();
       setEvent(ev);
       if (!ev) return;
+
+      const { count: photoCount } = await supabase
+        .from("photos")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", ev.id)
+        .eq("status", "published");
+      setTotalEventPhotos(photoCount ?? 0);
+
       const { data: sess } = await supabase
         .from("guest_sessions")
         .select("id")
@@ -122,9 +131,12 @@ function GuestGallery() {
 
       <main className="container mx-auto px-4 py-6">
         {displayed.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">
-            {tab === "favorites" ? "No favorites yet. Tap the heart on photos you love." : "No matches yet."}
-          </div>
+          <EmptyState
+            tab={tab}
+            matches={matches}
+            totalEventPhotos={totalEventPhotos}
+            slug={slug}
+          />
         ) : (
           <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {displayed.map((m) => m.photos && (
@@ -165,6 +177,83 @@ function GuestGallery() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function EmptyState({
+  tab,
+  matches,
+  totalEventPhotos,
+  slug,
+}: {
+  tab: "best" | "all" | "favorites";
+  matches: Match[];
+  totalEventPhotos: number | null;
+  slug: string;
+}) {
+  if (tab === "favorites") {
+    return (
+      <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+        <Heart className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+        <p className="text-muted-foreground font-medium">No favorites yet</p>
+        <p className="text-sm text-muted-foreground mt-1">Tap the heart icon on photos you love to save them here.</p>
+      </div>
+    );
+  }
+
+  if (tab === "best" && matches.length > 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+        <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+        <p className="text-muted-foreground font-medium">No high-confidence matches</p>
+        <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+          We found potential matches, but confidence is low. Try the <strong>All</strong> tab to see every possible match.
+        </p>
+        <div className="mt-4 text-left max-w-sm mx-auto bg-secondary/50 rounded-xl p-4 text-sm space-y-2">
+          <p className="font-medium flex items-center gap-2"><Lightbulb className="h-4 w-4 text-primary shrink-0" />Why confidence might be low:</p>
+          <ul className="list-disc pl-5 text-muted-foreground space-y-1">
+            <li>Different lighting between your selfie and event photos</li>
+            <li>Your face was partially turned or at an unusual angle</li>
+            <li>Sunglasses, hats, or facial hair differences</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
+  if (tab === "all" && totalEventPhotos === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+        <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+        <p className="text-muted-foreground font-medium">No photos in this event yet</p>
+        <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+          The event organizer hasn't uploaded any photos. Check back later.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+      <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+      <p className="text-muted-foreground font-medium">No matches found</p>
+      <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+        We found your face, but couldn't match it to photos in this event. This can happen if you weren't in many photos, or if lighting and angles make matching difficult.
+      </p>
+      <div className="mt-4 text-left max-w-sm mx-auto bg-secondary/50 rounded-xl p-4 text-sm space-y-2">
+        <p className="font-medium flex items-center gap-2"><Lightbulb className="h-4 w-4 text-primary shrink-0" />Tips for better results:</p>
+        <ul className="list-disc pl-5 text-muted-foreground space-y-1">
+          <li>Use a well-lit, front-facing selfie with a neutral expression</li>
+          <li>Remove sunglasses, hats, or anything covering your face</li>
+          <li>Make sure your face fills most of the frame</li>
+          <li>Try again with a different photo if you have one</li>
+        </ul>
+      </div>
+      <a href={`/e/${slug}`} className="inline-flex items-center gap-2 mt-6 text-sm text-primary hover:underline">
+        <RefreshCw className="h-4 w-4" />
+        Try a different selfie
+      </a>
     </div>
   );
 }
