@@ -42,7 +42,7 @@ function EventDetail() {
 
   const guestUrl =
     typeof window !== "undefined" && event
-      ? `${window.location.origin}/e/${event.slug}`
+      ? `${getShareableOrigin()}/e/${event.slug}`
       : "";
 
   const load = useCallback(async () => {
