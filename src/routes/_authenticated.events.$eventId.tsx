@@ -79,10 +79,11 @@ function EventDetail() {
     }
   }, [guestUrl]);
 
-  async function toggle(field: keyof EventRow, value: boolean) {
+  async function toggle(field: "active" | "downloads_enabled" | "watermark_enabled" | "review_mode", value: boolean) {
     if (!event) return;
     setEvent({ ...event, [field]: value });
-    const { error } = await supabase.from("events").update({ [field]: value }).eq("id", event.id);
+    const patch: Partial<EventRow> = { [field]: value };
+    const { error } = await supabase.from("events").update(patch).eq("id", event.id);
     if (error) toast.error(error.message);
   }
 
