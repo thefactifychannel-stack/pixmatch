@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Camera, Loader2, Sparkles } from "lucide-react";
+import { Camera, Loader2, Sparkles, RefreshCw, AlertCircle, Lightbulb } from "lucide-react";
 import {
   detectSingleFace,
   euclideanDistance,
@@ -32,6 +32,7 @@ function GuestLanding() {
   const [event, setEvent] = useState<EventRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<string>("");
+  const [error, setError] = useState<"no_face" | "no_photos" | null>(null);
 
   useEffect(() => {
     supabase
@@ -46,6 +47,7 @@ function GuestLanding() {
   async function handleSelfie(file: File) {
     if (!event) return;
     setBusy(true);
+    setError(null);
     try {
       setStep("Loading face engine…");
       await loadFaceModels();
@@ -55,7 +57,7 @@ function GuestLanding() {
       const img = await loadImageFromBlob(resized);
       const face = await detectSingleFace(img);
       if (!face) {
-        toast.error("No face detected. Try a clearer selfie.");
+        setError("no_face");
         setBusy(false);
         return;
       }
@@ -123,29 +125,61 @@ function GuestLanding() {
         <h1 className="text-3xl font-semibold tracking-tight">{event.name}</h1>
         {event.description && <p className="text-muted-foreground mt-2">{event.description}</p>}
         <div className="mt-10 rounded-2xl border border-border bg-card p-8 shadow-[var(--shadow-elegant)]">
-          <Camera className="h-10 w-10 text-primary mx-auto mb-4" />
-          <h2 className="font-semibold text-xl">Find your photos</h2>
-          <p className="text-sm text-muted-foreground mt-2 mb-6">
-            Take or upload a selfie. We'll match it to photos containing you. Your selfie is processed on your device and never stored.
-          </p>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="user"
-            className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleSelfie(e.target.files[0])}
-          />
-          <Button size="lg" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}>
-            {busy ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {step || "Working…"}
-              </>
-            ) : (
-              "Upload selfie"
-            )}
-          </Button>
+          {error === "no_face" ? (
+            <div className="text-left">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="h-6 w-6 text-destructive" />
+                <h2 className="font-semibold text-xl">No face detected</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                We couldn't find a clear face in your photo. This usually happens when:
+              </p>
+              <ul className="text-sm space-y-2 mb-6">
+                <li className="flex gap-2">
+                  <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>The photo is too dark, blurry, or backlit</span>
+                </li>
+                <li className="flex gap-2">
+                  <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Your face is too small, turned sideways, or covered</span>
+                </li>
+                <li className="flex gap-2">
+                  <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Multiple faces are competing for focus</span>
+                </li>
+              </ul>
+              <Button size="lg" className="w-full" onClick={() => { setError(null); fileRef.current?.click(); }}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try another photo
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Camera className="h-10 w-10 text-primary mx-auto mb-4" />
+              <h2 className="font-semibold text-xl">Find your photos</h2>
+              <p className="text-sm text-muted-foreground mt-2 mb-6">
+                Take or upload a selfie. We'll match it to photos containing you. Your selfie is processed on your device and never stored.
+              </p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleSelfie(e.target.files[0])}
+              />
+              <Button size="lg" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}>
+                {busy ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {step || "Working…"}
+                  </>
+                ) : (
+                  "Upload selfie"
+                )}
+              </Button>
+            </>
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-6">Powered by PhotoFlow</p>
       </div>
