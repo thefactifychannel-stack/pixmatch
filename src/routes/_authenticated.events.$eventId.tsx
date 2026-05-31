@@ -33,6 +33,18 @@ export const Route = createFileRoute("/_authenticated/events/$eventId")({
   component: EventDetail,
 });
 
+function getShareableOrigin() {
+  if (typeof window === "undefined") return "";
+  const host = window.location.hostname;
+  // Lovable preview/sandbox hosts redirect anonymous visitors to lovable.dev.
+  // Map them to the stable public preview URL so QR codes work on guests' phones.
+  const m = host.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
+  if (m && (host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com"))) {
+    return `https://project--${m[1]}-dev.lovable.app`;
+  }
+  return window.location.origin;
+}
+
 function EventDetail() {
   const { eventId } = Route.useParams();
   const [event, setEvent] = useState<EventRow | null>(null);
@@ -42,7 +54,7 @@ function EventDetail() {
 
   const guestUrl =
     typeof window !== "undefined" && event
-      ? `${window.location.origin}/e/${event.slug}`
+      ? `${getShareableOrigin()}/e/${event.slug}`
       : "";
 
   const load = useCallback(async () => {
