@@ -12,8 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ESlugRouteImport } from './routes/e.$slug'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedEventsEventIdRouteImport } from './routes/_authenticated.events.$eventId'
+import { Route as ESlugGalleryTokenRouteImport } from './routes/e.$slug.gallery.$token'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -29,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ESlugRoute = ESlugRouteImport.update({
+  id: '/e/$slug',
+  path: '/e/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -40,18 +47,27 @@ const AuthenticatedEventsEventIdRoute =
     path: '/events/$eventId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const ESlugGalleryTokenRoute = ESlugGalleryTokenRouteImport.update({
+  id: '/gallery/$token',
+  path: '/gallery/$token',
+  getParentRoute: () => ESlugRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/e/$slug': typeof ESlugRouteWithChildren
   '/events/$eventId': typeof AuthenticatedEventsEventIdRoute
+  '/e/$slug/gallery/$token': typeof ESlugGalleryTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/e/$slug': typeof ESlugRouteWithChildren
   '/events/$eventId': typeof AuthenticatedEventsEventIdRoute
+  '/e/$slug/gallery/$token': typeof ESlugGalleryTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -59,26 +75,43 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/e/$slug': typeof ESlugRouteWithChildren
   '/_authenticated/events/$eventId': typeof AuthenticatedEventsEventIdRoute
+  '/e/$slug/gallery/$token': typeof ESlugGalleryTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard' | '/events/$eventId'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/e/$slug'
+    | '/events/$eventId'
+    | '/e/$slug/gallery/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/events/$eventId'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/e/$slug'
+    | '/events/$eventId'
+    | '/e/$slug/gallery/$token'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/dashboard'
+    | '/e/$slug'
     | '/_authenticated/events/$eventId'
+    | '/e/$slug/gallery/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ESlugRoute: typeof ESlugRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -104,6 +137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/e/$slug': {
+      id: '/e/$slug'
+      path: '/e/$slug'
+      fullPath: '/e/$slug'
+      preLoaderRoute: typeof ESlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -117,6 +157,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/events/$eventId'
       preLoaderRoute: typeof AuthenticatedEventsEventIdRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/e/$slug/gallery/$token': {
+      id: '/e/$slug/gallery/$token'
+      path: '/gallery/$token'
+      fullPath: '/e/$slug/gallery/$token'
+      preLoaderRoute: typeof ESlugGalleryTokenRouteImport
+      parentRoute: typeof ESlugRoute
     }
   }
 }
@@ -135,11 +182,32 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface ESlugRouteChildren {
+  ESlugGalleryTokenRoute: typeof ESlugGalleryTokenRoute
+}
+
+const ESlugRouteChildren: ESlugRouteChildren = {
+  ESlugGalleryTokenRoute: ESlugGalleryTokenRoute,
+}
+
+const ESlugRouteWithChildren = ESlugRoute._addFileChildren(ESlugRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  ESlugRoute: ESlugRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
