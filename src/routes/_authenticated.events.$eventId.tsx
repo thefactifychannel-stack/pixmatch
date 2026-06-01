@@ -40,7 +40,7 @@ function getShareableOrigin() {
   // Map them to the stable public preview URL so QR codes work on guests' phones.
   const m = host.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
   if (m && (host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com"))) {
-    return `https://project--${m[1]}-dev.lovable.app`;
+    return `https://project--${m[1]}.lovable.app`;
   }
   return window.location.origin;
 }
