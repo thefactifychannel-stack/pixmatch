@@ -36,11 +36,9 @@ export const Route = createFileRoute("/_authenticated/events/$eventId")({
 function getShareableOrigin() {
   if (typeof window === "undefined") return "";
   const host = window.location.hostname;
-  // Lovable preview/sandbox hosts redirect anonymous visitors to lovable.dev.
-  // Map them to the stable public preview URL so QR codes work on guests' phones.
-  const m = host.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
-  if (m && (host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com"))) {
-    return `https://project--${m[1]}.lovable.app`;
+  // Lovable preview/sandbox hosts require auth; route guests to the published app.
+  if (host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com")) {
+    return "https://pixmatch.lovable.app";
   }
   return window.location.origin;
 }
