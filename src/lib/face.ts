@@ -50,24 +50,37 @@ export async function detectSingleFace(
   imgEl: HTMLImageElement,
 ): Promise<DetectedFace | null> {
   await loadFaceModels();
-  const opts = new faceapi.TinyFaceDetectorOptions({
-    inputSize: 416,
-    scoreThreshold: 0.5,
-  });
-  const result = await faceapi
-    .detectSingleFace(imgEl, opts)
-    .withFaceLandmarks(true)
-    .withFaceDescriptor();
-  if (!result) return null;
-  return {
-    embedding: Array.from(result.descriptor),
-    box: {
-      x: result.detection.box.x,
-      y: result.detection.box.y,
-      width: result.detection.box.width,
-      height: result.detection.box.height,
-    },
-  };
+  // Try progressively larger input sizes and lower thresholds so we don't
+  // miss small / off-center faces in a guest's selfie.
+  const attempts: Array<{ inputSize: number; scoreThreshold: number }> = [
+    { inputSize: 608, scoreThreshold: 0.4 },
+    { inputSize: 512, scoreThreshold: 0.3 },
+    { inputSize: 416, scoreThreshold: 0.3 },
+  ];
+  for (const a of attempts) {
+    const opts = new faceapi.TinyFaceDetectorOptions(a);
+    // Detect all faces, then pick the largest — handles selfies where the
+    // intended face is biggest but not most centered.
+    const results = await faceapi
+      .detectAllFaces(imgEl, opts)
+      .withFaceLandmarks(true)
+      .withFaceDescriptors();
+    if (results.length > 0) {
+      const best = results.reduce((a, b) =>
+        a.detection.box.area > b.detection.box.area ? a : b,
+      );
+      return {
+        embedding: Array.from(best.descriptor),
+        box: {
+          x: best.detection.box.x,
+          y: best.detection.box.y,
+          width: best.detection.box.width,
+          height: best.detection.box.height,
+        },
+      };
+    }
+  }
+  return null;
 }
 
 export function euclideanDistance(a: number[], b: number[]): number {
@@ -116,7 +129,14 @@ export async function resizeImage(
   maxDim: number,
   quality = 0.85,
 ): Promise<Blob> {
-  const bmp = await createImageBitmap(file);
+  // Respect EXIF orientation so a portrait phone/DSLR photo isn't fed
+  // sideways to the face detector.
+  let bmp: ImageBitmap;
+  try {
+    bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    bmp = await createImageBitmap(file);
+  }
   const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
   const w = Math.round(bmp.width * scale);
   const h = Math.round(bmp.height * scale);
