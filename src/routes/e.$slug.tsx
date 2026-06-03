@@ -6,12 +6,11 @@ import { toast } from "sonner";
 import { Camera, Loader2, Sparkles, RefreshCw, AlertCircle, Lightbulb } from "lucide-react";
 import {
   detectSingleFace,
-  euclideanDistance,
-  distanceToConfidence,
   loadFaceModels,
   loadImageFromBlob,
   resizeImage,
 } from "@/lib/face";
+import { matchGuestSelfie } from "@/lib/guest.functions";
 
 type EventRow = { id: string; name: string; description: string | null; slug: string };
 
