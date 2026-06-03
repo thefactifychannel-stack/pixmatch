@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+async function getAdminClient() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
 
 function euclidean(a: number[], b: number[]): number {
   let s = 0;
@@ -27,6 +31,7 @@ const matchInput = z.object({
 export const matchGuestSelfie = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => matchInput.parse(d))
   .handler(async ({ data }) => {
+    const supabaseAdmin = await getAdminClient();
     const { data: ev, error: evErr } = await supabaseAdmin
       .from("events")
       .select("id")
@@ -81,6 +86,7 @@ export const getGuestGallery = createServerFn({ method: "POST" })
     z.object({ slug: z.string().min(1).max(255), token: tokenSchema }).parse(d),
   )
   .handler(async ({ data }) => {
+    const supabaseAdmin = await getAdminClient();
     const { data: ev } = await supabaseAdmin
       .from("events")
       .select("id, name, downloads_enabled")
@@ -130,6 +136,7 @@ export const toggleGuestFavorite = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
+    const supabaseAdmin = await getAdminClient();
     const { data: sess } = await supabaseAdmin
       .from("guest_sessions")
       .select("id")
