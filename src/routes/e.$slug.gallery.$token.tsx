@@ -33,6 +33,7 @@ function GuestGallery() {
   const [tab, setTab] = useState<"best" | "all" | "favorites">("best");
   const [viewer, setViewer] = useState<string | null>(null);
   const [totalEventPhotos, setTotalEventPhotos] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -43,8 +44,10 @@ function GuestGallery() {
         setSessionId(res.sessionId);
         setMatches(res.matches as Match[]);
         setFavorites(new Set(res.favorites));
+        setLoadError(null);
       } catch (e) {
         console.error(e);
+        setLoadError(e instanceof Error ? e.message : "Gallery could not load");
       }
     })();
   }, [slug, token]);
@@ -81,7 +84,24 @@ function GuestGallery() {
     }
   }
 
-  if (!event) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
+  if (!event) {
+    if (loadError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background px-4">
+          <div className="max-w-sm text-center">
+            <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-3" />
+            <h1 className="font-semibold text-lg">Gallery couldn't load</h1>
+            <p className="text-sm text-muted-foreground mt-2">{loadError}</p>
+            <a href={`/e/${slug}`} className="inline-flex items-center gap-2 mt-6 text-sm text-primary hover:underline">
+              <RefreshCw className="h-4 w-4" />
+              Search again
+            </a>
+          </div>
+        </div>
+      );
+    }
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background">
