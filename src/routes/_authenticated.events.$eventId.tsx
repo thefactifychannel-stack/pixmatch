@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import QRCode from "qrcode";
 import { PhotoUploader } from "@/components/photoflow/PhotoUploader";
 import { publicPhotoUrl } from "@/lib/storage-url";
 import { ArrowLeft, Download, Trash2, Heart } from "lucide-react";
@@ -85,7 +84,9 @@ function EventDetail() {
 
   useEffect(() => {
     if (guestUrl) {
-      QRCode.toDataURL(guestUrl, { width: 320, margin: 2, color: { dark: "#1a1a1a", light: "#ffffff" } }).then(setQrUrl);
+      import("qrcode").then(({ default: QRCode }) => {
+        QRCode.toDataURL(guestUrl, { width: 320, margin: 2, color: { dark: "#1a1a1a", light: "#ffffff" } }).then(setQrUrl);
+      });
     }
   }, [guestUrl]);
 
