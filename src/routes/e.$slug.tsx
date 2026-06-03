@@ -53,7 +53,9 @@ function GuestLanding() {
       await loadFaceModels();
 
       setStep("Detecting your face…");
-      const resized = await resizeImage(file, 800, 0.9);
+      // Larger working size so faces in wider/group selfies stay big enough
+      // for TinyFaceDetector to find them reliably.
+      const resized = await resizeImage(file, 1280, 0.92);
       const img = await loadImageFromBlob(resized);
       const face = await detectSingleFace(img);
       if (!face) {
