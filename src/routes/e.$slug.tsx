@@ -6,12 +6,11 @@ import { toast } from "sonner";
 import { Camera, Loader2, Sparkles, RefreshCw, AlertCircle, Lightbulb } from "lucide-react";
 import {
   detectSingleFace,
-  euclideanDistance,
-  distanceToConfidence,
   loadFaceModels,
   loadImageFromBlob,
   resizeImage,
 } from "@/lib/face";
+import { matchGuestSelfie } from "@/lib/guest.functions";
 
 type EventRow = { id: string; name: string; description: string | null; slug: string };
 
@@ -65,44 +64,10 @@ function GuestLanding() {
       }
 
       setStep("Searching the gallery…");
-      const { data: faces, error } = await supabase
-        .from("photo_faces")
-        .select("photo_id, embedding")
-        .eq("event_id", event.id);
-      if (error) throw error;
-
-      // best distance per photo
-      const best = new Map<string, number>();
-      for (const f of faces ?? []) {
-        const d = euclideanDistance(face.embedding, f.embedding as number[]);
-        const cur = best.get(f.photo_id);
-        if (cur === undefined || d < cur) best.set(f.photo_id, d);
-      }
-
-      const matches = Array.from(best.entries())
-        .filter(([, d]) => d < 0.65)
-        .map(([photo_id, d]) => ({ photo_id, confidence: distanceToConfidence(d) }));
-
-      setStep("Building your gallery…");
-      const token = crypto.randomUUID().replace(/-/g, "");
-      const { data: session, error: sErr } = await supabase
-        .from("guest_sessions")
-        .insert({ event_id: event.id, token })
-        .select("id, token")
-        .single();
-      if (sErr || !session) throw sErr;
-
-      if (matches.length > 0) {
-        await supabase.from("guest_matches").insert(
-          matches.map((m) => ({
-            session_id: session.id,
-            photo_id: m.photo_id,
-            confidence: m.confidence,
-          })),
-        );
-      }
-
-      navigate({ to: "/e/$slug/gallery/$token", params: { slug, token: session.token } });
+      const { token } = await matchGuestSelfie({
+        data: { slug, embedding: Array.from(face.embedding) },
+      });
+      navigate({ to: "/e/$slug/gallery/$token", params: { slug, token } });
     } catch (err: unknown) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Something went wrong");

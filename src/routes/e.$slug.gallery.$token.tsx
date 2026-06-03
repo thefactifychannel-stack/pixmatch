@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Heart, Download, Share2, X, ArrowLeft, AlertCircle, Camera, Lightbulb, RefreshCw } from "lucide-react";
 import { publicPhotoUrl } from "@/lib/storage-url";
+import { getGuestGallery, toggleGuestFavorite } from "@/lib/guest.functions";
 
 type Match = {
   photo_id: string;
@@ -36,39 +36,16 @@ function GuestGallery() {
 
   useEffect(() => {
     (async () => {
-      const { data: ev } = await supabase
-        .from("events")
-        .select("id,name,downloads_enabled")
-        .eq("slug", slug)
-        .maybeSingle();
-      setEvent(ev);
-      if (!ev) return;
-
-      const { count: photoCount } = await supabase
-        .from("photos")
-        .select("id", { count: "exact", head: true })
-        .eq("event_id", ev.id)
-        .eq("status", "published");
-      setTotalEventPhotos(photoCount ?? 0);
-
-      const { data: sess } = await supabase
-        .from("guest_sessions")
-        .select("id")
-        .eq("token", token)
-        .maybeSingle();
-      if (!sess) return;
-      setSessionId(sess.id);
-      const { data: m } = await supabase
-        .from("guest_matches")
-        .select("photo_id, confidence, photos(id,thumb_path,preview_path,storage_path)")
-        .eq("session_id", sess.id)
-        .order("confidence", { ascending: false });
-      setMatches((m ?? []) as Match[]);
-      const { data: favs } = await supabase
-        .from("favorites")
-        .select("photo_id")
-        .eq("session_id", sess.id);
-      setFavorites(new Set((favs ?? []).map((f) => f.photo_id)));
+      try {
+        const res = await getGuestGallery({ data: { slug, token } });
+        setEvent(res.event as EventRow);
+        setTotalEventPhotos(res.totalEventPhotos);
+        setSessionId(res.sessionId);
+        setMatches(res.matches as Match[]);
+        setFavorites(new Set(res.favorites));
+      } catch (e) {
+        console.error(e);
+      }
     })();
   }, [slug, token]);
 
@@ -78,11 +55,11 @@ function GuestGallery() {
     if (next.has(photoId)) {
       next.delete(photoId);
       setFavorites(next);
-      await supabase.from("favorites").delete().eq("session_id", sessionId).eq("photo_id", photoId);
+      await toggleGuestFavorite({ data: { token, photoId, on: false } });
     } else {
       next.add(photoId);
       setFavorites(next);
-      await supabase.from("favorites").insert({ session_id: sessionId, photo_id: photoId });
+      await toggleGuestFavorite({ data: { token, photoId, on: true } });
     }
   }
 
