@@ -41,7 +41,22 @@ function AuthPage() {
           password,
           options: { emailRedirectTo: `${window.location.origin}/dashboard` },
         });
-        if (error) throw error;
+        if (error) {
+          // Surface common signup errors in plain language
+          const code = (error as { code?: string }).code;
+          if (code === "weak_password" || /pwned|weak/i.test(error.message)) {
+            toast.error(
+              "That password has appeared in known data breaches. Please pick a stronger, unique password (mix of upper/lowercase, numbers, and symbols — at least 10 characters)."
+            );
+            return;
+          }
+          if (code === "user_already_exists" || /already registered|already exists/i.test(error.message)) {
+            toast.error("An account with this email already exists. Try signing in instead.");
+            setMode("login");
+            return;
+          }
+          throw error;
+        }
         if (data.session) {
           navigate({ to: "/dashboard" });
         } else {
