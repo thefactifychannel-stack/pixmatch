@@ -33,23 +33,23 @@ function AuthPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    const normalizedEmail = email.trim();
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
+        const { data, error } = await supabase.auth.signUp({
+          email: normalizedEmail,
           password,
           options: { emailRedirectTo: `${window.location.origin}/dashboard` },
         });
         if (error) throw error;
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) {
-          toast.success("Account created. Please sign in.");
-          setMode("login");
-        } else {
+        if (data.session) {
           navigate({ to: "/dashboard" });
+        } else {
+          toast.success("Account created. Please check your email to confirm it, then sign in.");
+          setMode("login");
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
         if (error) throw error;
         navigate({ to: "/dashboard" });
       }
