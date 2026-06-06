@@ -1,5 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate, Link, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -84,7 +89,9 @@ function AuthPage() {
 
     const verifiedEmail = data.user.email ?? "";
     if (verifiedEmail.toLowerCase() !== expectedEmail.toLowerCase()) {
-      throw new Error(`Signed in as ${verifiedEmail || "another account"}, not ${expectedEmail}. Please try again.`);
+      throw new Error(
+        `Signed in as ${verifiedEmail || "another account"}, not ${expectedEmail}. Please try again.`,
+      );
     }
 
     setCurrentEmail(verifiedEmail);
@@ -122,7 +129,10 @@ function AuthPage() {
           const message = getAuthErrorMessage(error);
           setNotice({ type: "error", title: "Signup failed", description: message });
           toast.error(message, { id: "auth-flow" });
-          if ((error as { code?: string }).code === "user_already_exists" || /already registered|already exists/i.test(error.message)) {
+          if (
+            (error as { code?: string }).code === "user_already_exists" ||
+            /already registered|already exists/i.test(error.message)
+          ) {
             setMode("login");
           }
           return;
@@ -135,12 +145,17 @@ function AuthPage() {
             title: "Account created",
             description: "Please check your email to confirm the account, then sign in with the same credentials.",
           });
-          toast.success("Account created. Check your email to confirm it, then sign in.", { id: "auth-flow" });
+          toast.success("Account created. Check your email to confirm it, then sign in.", {
+            id: "auth-flow",
+          });
           setMode("login");
         }
       } else {
         setStatusText("Checking credentials…");
-        const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+        const { error } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
         if (error) {
           const message = getAuthErrorMessage(error);
           setNotice({ type: "error", title: "Login failed", description: message });
