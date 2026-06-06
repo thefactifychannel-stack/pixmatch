@@ -35,7 +35,9 @@ export function Header() {
           {email ? (
             <>
               <Link to="/dashboard">
-                <Button variant="ghost" size="sm">Dashboard</Button>
+                <Button variant="ghost" size="sm">
+                  Dashboard
+                </Button>
               </Link>
               <Button
                 variant="outline"
