@@ -227,17 +227,34 @@ function AuthPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required minLength={8} disabled={loading} value={password} onChange={(e) => setPassword(e.target.value)} />
+            <Input
+              id="password"
+              type="password"
+              required
+              minLength={8}
+              disabled={loading}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </div>
           {loading && (
-            <div className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground" aria-live="polite">
+            <div
+              className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+              aria-live="polite"
+            >
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>{statusText || "Processing…"}</span>
             </div>
           )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {loading ? (mode === "login" ? "Signing in…" : "Creating account…") : mode === "login" ? "Sign in" : "Sign up"}
+            {loading
+              ? mode === "login"
+                ? "Signing in…"
+                : "Creating account…"
+              : mode === "login"
+                ? "Sign in"
+                : "Sign up"}
           </Button>
         </form>
         <button
