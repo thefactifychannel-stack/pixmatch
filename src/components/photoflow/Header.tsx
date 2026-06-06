@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,10 +8,15 @@ import { Camera } from "lucide-react";
 export function Header() {
   const [email, setEmail] = useState<string | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setEmail(data.session?.user.email ?? null);
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (error) {
+        setEmail(null);
+        return;
+      }
+      setEmail(data.user?.email ?? null);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setEmail(session?.user.email ?? null);
@@ -35,8 +41,10 @@ export function Header() {
                 variant="outline"
                 size="sm"
                 onClick={async () => {
+                  await queryClient.cancelQueries();
+                  queryClient.clear();
                   await supabase.auth.signOut();
-                  navigate({ to: "/" });
+                  navigate({ to: "/auth", replace: true });
                 }}
               >
                 Sign out
