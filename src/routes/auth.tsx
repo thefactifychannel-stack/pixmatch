@@ -166,7 +166,11 @@ function AuthPage() {
       }
     } catch (err: unknown) {
       const message = getAuthErrorMessage(err);
-      setNotice({ type: "error", title: `${mode === "signup" ? "Signup" : "Login"} failed`, description: message });
+      setNotice({
+        type: "error",
+        title: `${mode === "signup" ? "Signup" : "Login"} failed`,
+        description: message,
+      });
       toast.error(message, { id: "auth-flow" });
     } finally {
       setLoading(false);
@@ -178,7 +182,10 @@ function AuthPage() {
   const NoticeIcon = noticeIcon;
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--gradient-hero)" }}>
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "var(--gradient-hero)" }}
+    >
       <div className="w-full max-w-sm rounded-2xl bg-card p-8 shadow-[var(--shadow-elegant)] border border-border">
         <Link to="/" className="flex items-center gap-2 font-semibold mb-6 justify-center">
           <Camera className="h-5 w-5 text-primary" />
@@ -194,7 +201,9 @@ function AuthPage() {
           <Alert className="mb-4">
             <Info className="h-4 w-4" />
             <AlertTitle>Current session</AlertTitle>
-            <AlertDescription className="break-all">Signed in as {currentEmail}. Submitting this form will switch accounts.</AlertDescription>
+            <AlertDescription className="break-all">
+              Signed in as {currentEmail}. Submitting this form will switch accounts.
+            </AlertDescription>
           </Alert>
         )}
         {notice && (
@@ -207,7 +216,14 @@ function AuthPage() {
         <form onSubmit={submit} className="space-y-4" aria-busy={loading}>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" required disabled={loading} value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              id="email"
+              type="email"
+              required
+              disabled={loading}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
