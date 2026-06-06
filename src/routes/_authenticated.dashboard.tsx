@@ -5,7 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Calendar, ArrowRight } from "lucide-react";
 
@@ -60,12 +67,17 @@ function DashboardPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Your events</h1>
           <p className="text-muted-foreground mt-1">
-            {userEmail ? `Signed in as ${userEmail}` : "Create an event, upload photos, share the QR."}
+            {userEmail
+              ? `Signed in as ${userEmail}`
+              : "Create an event, upload photos, share the QR."}
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />New event</Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New event
+            </Button>
           </DialogTrigger>
           <CreateEventDialog
             onCreated={() => {
@@ -104,7 +116,9 @@ function DashboardPage() {
                 <p className="text-sm text-muted-foreground mt-3 line-clamp-2">{e.description}</p>
               )}
               <div className="mt-4 inline-flex items-center gap-2 text-xs">
-                <span className={`h-2 w-2 rounded-full ${e.active ? "bg-primary" : "bg-muted-foreground"}`} />
+                <span
+                  className={`h-2 w-2 rounded-full ${e.active ? "bg-primary" : "bg-muted-foreground"}`}
+                />
                 {e.active ? "Active" : "Inactive"}
               </div>
             </Link>
