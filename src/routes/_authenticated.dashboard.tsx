@@ -177,11 +177,21 @@ function CreateEventDialog({ onCreated }: { onCreated: () => void }) {
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Event name</Label>
-          <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Sarah & James Wedding" />
+          <Input
+            id="name"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Sarah & James Wedding"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="desc">Description (optional)</Label>
-          <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <Textarea
+            id="desc"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </div>
         <DialogFooter>
           <Button type="submit" disabled={loading || !name}>
