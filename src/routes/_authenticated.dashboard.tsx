@@ -129,6 +129,7 @@ function DashboardPage() {
   );
 }
 
+
 function slugify(name: string) {
   return name
     .toLowerCase()
