@@ -5,12 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Calendar, ArrowRight } from "lucide-react";
 
 type EventRow = {
   id: string;
+  owner_id: string;
   name: string;
   slug: string;
   description: string | null;
@@ -27,12 +35,22 @@ function DashboardPage() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      toast.error("Please sign in again to load your dashboard.");
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
+    setUserEmail(userData.user.email ?? null);
     const { data, error } = await supabase
       .from("events")
-      .select("id,name,slug,description,active,created_at")
+      .select("id,owner_id,name,slug,description,active,created_at")
+      .eq("owner_id", userData.user.id)
       .order("created_at", { ascending: false });
     if (error) toast.error(error.message);
     setEvents(data ?? []);
@@ -48,11 +66,18 @@ function DashboardPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Your events</h1>
-          <p className="text-muted-foreground mt-1">Create an event, upload photos, share the QR.</p>
+          <p className="text-muted-foreground mt-1">
+            {userEmail
+              ? `Signed in as ${userEmail}`
+              : "Create an event, upload photos, share the QR."}
+          </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />New event</Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New event
+            </Button>
           </DialogTrigger>
           <CreateEventDialog
             onCreated={() => {
@@ -91,7 +116,9 @@ function DashboardPage() {
                 <p className="text-sm text-muted-foreground mt-3 line-clamp-2">{e.description}</p>
               )}
               <div className="mt-4 inline-flex items-center gap-2 text-xs">
-                <span className={`h-2 w-2 rounded-full ${e.active ? "bg-primary" : "bg-muted-foreground"}`} />
+                <span
+                  className={`h-2 w-2 rounded-full ${e.active ? "bg-primary" : "bg-muted-foreground"}`}
+                />
                 {e.active ? "Active" : "Inactive"}
               </div>
             </Link>
@@ -119,7 +146,11 @@ function CreateEventDialog({ onCreated }: { onCreated: () => void }) {
     e.preventDefault();
     setLoading(true);
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
+    if (!u.user) {
+      toast.error("Please sign in again before creating an event.");
+      setLoading(false);
+      return;
+    }
     const slug = `${slugify(name)}-${Math.random().toString(36).slice(2, 6)}`;
     const { error } = await supabase.from("events").insert({
       name,
@@ -146,11 +177,21 @@ function CreateEventDialog({ onCreated }: { onCreated: () => void }) {
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Event name</Label>
-          <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Sarah & James Wedding" />
+          <Input
+            id="name"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Sarah & James Wedding"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="desc">Description (optional)</Label>
-          <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <Textarea
+            id="desc"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </div>
         <DialogFooter>
           <Button type="submit" disabled={loading || !name}>

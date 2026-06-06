@@ -13,16 +13,21 @@ function AuthLayout() {
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getUser().then(({ data, error }) => {
       if (!mounted) return;
-      if (!data.session) {
+      if (error || !data.user) {
         navigate({ to: "/auth" });
       } else {
         setReady(true);
       }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (!session) navigate({ to: "/auth" });
+      if (!session) {
+        setReady(false);
+        navigate({ to: "/auth" });
+      } else {
+        setReady(true);
+      }
     });
     return () => {
       mounted = false;
