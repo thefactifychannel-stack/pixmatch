@@ -1,10 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  createFileRoute,
-  Link,
-  useNavigate,
-  useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -143,7 +138,8 @@ function AuthPage() {
           setNotice({
             type: "success",
             title: "Account created",
-            description: "Please check your email to confirm the account, then sign in with the same credentials.",
+            description:
+              "Please check your email to confirm the account, then sign in with the same credentials.",
           });
           toast.success("Account created. Check your email to confirm it, then sign in.", {
             id: "auth-flow",
@@ -158,7 +154,11 @@ function AuthPage() {
         });
         if (error) {
           const message = getAuthErrorMessage(error);
-          setNotice({ type: "error", title: "Login failed", description: message });
+          setNotice({
+            type: "error",
+            title: "Login failed",
+            description: message,
+          });
           toast.error(message, { id: "auth-flow" });
           return;
         }
@@ -178,7 +178,8 @@ function AuthPage() {
     }
   }
 
-  const noticeIcon = notice?.type === "success" ? CheckCircle2 : notice?.type === "error" ? AlertCircle : Info;
+  const noticeIcon =
+    notice?.type === "success" ? CheckCircle2 : notice?.type === "error" ? AlertCircle : Info;
   const NoticeIcon = noticeIcon;
 
   return (
