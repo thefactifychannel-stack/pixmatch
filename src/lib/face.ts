@@ -149,3 +149,70 @@ export async function resizeImage(
     canvas.toBlob((b) => resolve(b!), "image/jpeg", quality),
   );
 }
+
+// Compute a 0..1 quality score from an image blob using:
+//   - brightness: mean luma (0..255)
+//   - sharpness:  variance of a 3x3 Laplacian on grayscale
+// Returns combined score plus the underlying metrics so callers can decide
+// "low light" vs "best" buckets.
+export async function computeImageQuality(
+  blob: Blob,
+): Promise<{ score: number; brightness: number; sharpness: number; lowLight: boolean }> {
+  let bmp: ImageBitmap;
+  try {
+    bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+  } catch {
+    bmp = await createImageBitmap(blob);
+  }
+  const maxDim = 256;
+  const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * scale));
+  const h = Math.max(1, Math.round(bmp.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(bmp, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+
+  // Grayscale + brightness
+  const gray = new Float32Array(w * h);
+  let sum = 0;
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    gray[p] = y;
+    sum += y;
+  }
+  const brightness = sum / (w * h); // 0..255
+
+  // Laplacian variance (sharpness proxy)
+  let lapSum = 0;
+  let lapSumSq = 0;
+  let count = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const v =
+        -gray[i - w] - gray[i - 1] + 4 * gray[i] - gray[i + 1] - gray[i + w];
+      lapSum += v;
+      lapSumSq += v * v;
+      count++;
+    }
+  }
+  const mean = lapSum / count;
+  const variance = lapSumSq / count - mean * mean;
+  // Normalize: typical sharp photo ~ 300+, blurry < 60
+  const sharpness = variance;
+
+  // Brightness scoring: ideal ~110-170, drops off outside that
+  const brightnessScore =
+    brightness < 60
+      ? Math.max(0, brightness / 60) * 0.5
+      : brightness > 220
+        ? Math.max(0, (255 - brightness) / 35) * 0.7
+        : 1;
+  const sharpnessScore = Math.max(0, Math.min(1, (sharpness - 40) / 260));
+  const score = Math.max(0, Math.min(1, 0.55 * sharpnessScore + 0.45 * brightnessScore));
+  const lowLight = brightness < 70 || sharpnessScore < 0.2;
+  return { score, brightness, sharpness, lowLight };
+}

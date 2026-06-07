@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Camera, Loader2, Sparkles, RefreshCw, AlertCircle, Lightbulb } from "lucide-react";
 import {
-  detectSingleFace,
+  detectFacesInImage,
   loadFaceModels,
   loadImageFromBlob,
   resizeImage,
@@ -13,6 +13,11 @@ import {
 import { matchGuestSelfie } from "@/lib/guest.functions";
 
 type EventRow = { id: string; name: string; description: string | null; slug: string };
+
+type Stage =
+  | { kind: "idle" }
+  | { kind: "uploading"; pct: number; label: string }
+  | { kind: "done"; matchCount: number; people: number; scanned: number; token: string };
 
 export const Route = createFileRoute("/e/$slug/")({
   component: GuestLanding,
@@ -23,8 +28,7 @@ function GuestLanding() {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [event, setEvent] = useState<EventRow | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState<string>("");
+  const [stage, setStage] = useState<Stage>({ kind: "idle" });
   const [error, setError] = useState<"no_face" | null>(null);
 
   useEffect(() => {
@@ -39,33 +43,39 @@ function GuestLanding() {
 
   async function handleSelfie(file: File) {
     if (!event) return;
-    setBusy(true);
     setError(null);
     try {
-      setStep("Loading face engine…");
+      setStage({ kind: "uploading", pct: 10, label: "Uploading photo…" });
       await loadFaceModels();
 
-      setStep("Detecting your face…");
+      setStage({ kind: "uploading", pct: 35, label: "Detecting faces…" });
       const resized = await resizeImage(file, 1280, 0.92);
       const img = await loadImageFromBlob(resized);
-      const face = await detectSingleFace(img);
-      if (!face) {
+      const faces = await detectFacesInImage(img);
+      if (!faces || faces.length === 0) {
         setError("no_face");
-        setBusy(false);
+        setStage({ kind: "idle" });
         return;
       }
 
-      setStep("Searching the gallery…");
-      const { token } = await matchGuestSelfie({
-        data: { slug, embedding: Array.from(face.embedding) },
+      setStage({ kind: "uploading", pct: 65, label: `Searching photos (${faces.length} ${faces.length === 1 ? "person" : "people"})…` });
+      const res = await matchGuestSelfie({
+        data: { slug, embeddings: faces.map((f) => Array.from(f.embedding)) },
       });
-      navigate({ to: "/e/$slug/gallery/$token", params: { slug, token } });
+
+      setStage({ kind: "uploading", pct: 90, label: "Organizing results…" });
+      await new Promise((r) => setTimeout(r, 250));
+      setStage({
+        kind: "done",
+        matchCount: res.matchCount,
+        people: res.peopleDetected,
+        scanned: res.totalScanned,
+        token: res.token,
+      });
     } catch (err: unknown) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setBusy(false);
-      setStep("");
+      setStage({ kind: "idle" });
     }
   }
 
@@ -112,6 +122,33 @@ function GuestLanding() {
                 Try another photo
               </Button>
             </div>
+          ) : stage.kind === "done" ? (
+            <div className="text-left">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-6 w-6 text-primary" />
+                <h2 className="font-semibold text-xl">Search complete</h2>
+              </div>
+              <div className="rounded-xl bg-secondary/60 p-4 text-sm space-y-1 mb-6">
+                <div className="flex justify-between"><span className="text-muted-foreground">People detected</span><span className="font-medium">{stage.people}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Photos scanned</span><span className="font-medium">{stage.scanned.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Matching photos</span><span className="font-medium text-primary">{stage.matchCount}</span></div>
+              </div>
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={() =>
+                  navigate({ to: "/e/$slug/gallery/$token", params: { slug, token: stage.token } })
+                }
+              >
+                View gallery →
+              </Button>
+              <button
+                className="w-full text-xs text-muted-foreground hover:text-foreground mt-3"
+                onClick={() => { setStage({ kind: "idle" }); fileRef.current?.click(); }}
+              >
+                Search with a different selfie
+              </button>
+            </div>
           ) : (
             <>
               <Camera className="h-10 w-10 text-primary mx-auto mb-4" />
@@ -127,16 +164,24 @@ function GuestLanding() {
                 className="hidden"
                 onChange={(e) => e.target.files?.[0] && handleSelfie(e.target.files[0])}
               />
-              <Button size="lg" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}>
-                {busy ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {step || "Working…"}
-                  </>
-                ) : (
-                  "Upload selfie"
-                )}
-              </Button>
+              {stage.kind === "uploading" ? (
+                <div className="w-full">
+                  <div className="relative w-full h-12 rounded-md bg-secondary overflow-hidden">
+                    <div
+                      className="absolute inset-y-0 left-0 bg-primary transition-all duration-300"
+                      style={{ width: `${stage.pct}%` }}
+                    />
+                    <div className="relative z-10 h-full flex items-center justify-center text-sm font-medium">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {stage.label} {stage.pct}%
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Button size="lg" className="w-full" onClick={() => fileRef.current?.click()}>
+                  Upload selfie
+                </Button>
+              )}
             </>
           )}
         </div>

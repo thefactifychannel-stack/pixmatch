@@ -8,6 +8,7 @@ import {
   loadImageFromBlob,
   loadFaceModels,
   resizeImage,
+  computeImageQuality,
 } from "@/lib/face";
 
 type Props = {
@@ -34,6 +35,7 @@ export function PhotoUploader({ eventId, onUploaded }: Props) {
         const originalBlob = await resizeImage(file, 2000, 0.85);
         const previewBlob = await resizeImage(file, 1200, 0.8);
         const thumbBlob = await resizeImage(file, 400, 0.7);
+        const quality = await computeImageQuality(previewBlob);
 
         const ts = Date.now();
         const base = `${eventId}/${ts}-${i}`;
@@ -69,6 +71,7 @@ export function PhotoUploader({ eventId, onUploaded }: Props) {
             thumb_path: thumbPath,
             status: "published",
             face_count: faces.length,
+            quality_score: quality.score,
           })
           .select("id")
           .single();
