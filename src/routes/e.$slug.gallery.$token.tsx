@@ -14,6 +14,7 @@ type Match = {
     thumb_path: string | null;
     preview_path: string | null;
     storage_path: string;
+    quality_score: number | null;
   } | null;
 };
 
@@ -30,7 +31,7 @@ function GuestGallery() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<"best" | "all" | "favorites">("best");
+  const [tab, setTab] = useState<"best" | "all" | "lowlight" | "favorites">("best");
   const [viewer, setViewer] = useState<string | null>(null);
   const [totalEventPhotos, setTotalEventPhotos] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -66,11 +67,34 @@ function GuestGallery() {
     }
   }
 
+  // Buckets:
+  //   best     -> confidence >= 0.55 AND quality_score >= 0.55 (good light + sharp)
+  //   lowlight -> quality_score < 0.4 (or null) — kept out of Best
+  //   all      -> every match
+  const buckets = useMemo(() => {
+    const best: Match[] = [];
+    const low: Match[] = [];
+    for (const m of matches) {
+      const q = m.photos?.quality_score ?? null;
+      if (q !== null && q < 0.4) low.push(m);
+      if (m.confidence >= 0.55 && (q === null || q >= 0.55)) best.push(m);
+    }
+    return { best, low };
+  }, [matches]);
+
+  const counts = {
+    all: matches.length,
+    best: buckets.best.length,
+    lowlight: buckets.low.length,
+    favorites: matches.filter((m) => favorites.has(m.photo_id)).length,
+  };
+
   const displayed = useMemo(() => {
-    if (tab === "best") return matches.filter((m) => m.confidence >= 0.55).slice(0, 24);
+    if (tab === "best") return buckets.best;
+    if (tab === "lowlight") return buckets.low;
     if (tab === "favorites") return matches.filter((m) => favorites.has(m.photo_id));
     return matches;
-  }, [matches, favorites, tab]);
+  }, [matches, favorites, tab, buckets]);
 
   const viewerMatch = matches.find((m) => m.photo_id === viewer);
 
@@ -113,20 +137,26 @@ function GuestGallery() {
           </div>
           <a href={`/e/${slug}`} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center"><ArrowLeft className="h-4 w-4 mr-1" />New search</a>
         </div>
-        <div className="container mx-auto px-4 pb-3 flex gap-2">
-          {(["best", "all", "favorites"] as const).map((t) => (
+        <div className="container mx-auto px-4 pb-3 flex gap-2 overflow-x-auto">
+          {(["best", "all", "lowlight", "favorites"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-1.5 rounded-full text-sm capitalize transition ${tab === t ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+              className={`shrink-0 px-4 py-1.5 rounded-full text-sm transition ${tab === t ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
             >
-              {t === "best" ? "Best" : t === "all" ? "All" : "Favorites"}
+              {t === "best" ? `Best · ${counts.best}` : t === "all" ? `All · ${counts.all}` : t === "lowlight" ? `Low Light · ${counts.lowlight}` : `Favourites · ${counts.favorites}`}
             </button>
           ))}
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6">
+        <div className="mb-6 rounded-xl border border-border bg-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          <SummaryStat label="Photos scanned" value={(totalEventPhotos ?? 0).toLocaleString()} />
+          <SummaryStat label="Matches" value={counts.all.toString()} accent />
+          <SummaryStat label="Best" value={counts.best.toString()} />
+          <SummaryStat label="Low Light" value={counts.lowlight.toString()} />
+        </div>
         {displayed.length === 0 ? (
           <EmptyState
             tab={tab}
@@ -184,7 +214,7 @@ function EmptyState({
   totalEventPhotos,
   slug,
 }: {
-  tab: "best" | "all" | "favorites";
+  tab: "best" | "all" | "lowlight" | "favorites";
   matches: Match[];
   totalEventPhotos: number | null;
   slug: string;
@@ -195,6 +225,16 @@ function EmptyState({
         <Heart className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
         <p className="text-muted-foreground font-medium">No favorites yet</p>
         <p className="text-sm text-muted-foreground mt-1">Tap the heart icon on photos you love to save them here.</p>
+      </div>
+    );
+  }
+
+  if (tab === "lowlight") {
+    return (
+      <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+        <Lightbulb className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+        <p className="text-muted-foreground font-medium">No low-light photos</p>
+        <p className="text-sm text-muted-foreground mt-1">All your matches are crisp and well-lit.</p>
       </div>
     );
   }
@@ -251,6 +291,15 @@ function EmptyState({
         <RefreshCw className="h-4 w-4" />
         Try a different selfie
       </a>
+    </div>
+  );
+}
+
+function SummaryStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`text-2xl font-semibold ${accent ? "text-primary" : ""}`}>{value}</p>
     </div>
   );
 }
