@@ -25,11 +25,24 @@ function distanceToConfidence(d: number): number {
 
 const matchInput = z.object({
   slug: z.string().min(1).max(255),
-  embedding: z.array(z.number()).min(64).max(1024),
+  // Legacy single embedding (kept for back-compat)
+  embedding: z.array(z.number()).min(64).max(1024).optional(),
+  // New: one embedding per face detected in the selfie
+  embeddings: z.array(z.array(z.number()).min(64).max(1024)).min(1).max(8).optional(),
 });
 
 export const matchGuestSelfie = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => matchInput.parse(d))
+  .inputValidator((d: unknown) => {
+    const parsed = matchInput.parse(d);
+    const embs =
+      parsed.embeddings && parsed.embeddings.length > 0
+        ? parsed.embeddings
+        : parsed.embedding
+          ? [parsed.embedding]
+          : null;
+    if (!embs) throw new Error("No face embedding provided");
+    return { slug: parsed.slug, embeddings: embs };
+  })
   .handler(async ({ data }) => {
     const supabaseAdmin = await getAdminClient();
     const { data: ev, error: evErr } = await supabaseAdmin
@@ -47,17 +60,30 @@ export const matchGuestSelfie = createServerFn({ method: "POST" })
       .eq("event_id", ev.id);
     if (fErr) throw new Error("Face lookup failed");
 
+    // For each face in the selfie, find best distance per photo. A photo
+    // matches if ANY selfie face is close enough to ANY face in the photo.
     const best = new Map<string, number>();
     for (const f of faces ?? []) {
       const emb = f.embedding as unknown as number[];
       if (!Array.isArray(emb)) continue;
-      const d = euclidean(data.embedding, emb);
+      let bestD = Infinity;
+      for (const q of data.embeddings) {
+        const d = euclidean(q, emb);
+        if (d < bestD) bestD = d;
+      }
       const cur = best.get(f.photo_id);
-      if (cur === undefined || d < cur) best.set(f.photo_id, d);
+      if (cur === undefined || bestD < cur) best.set(f.photo_id, bestD);
     }
     const matches = Array.from(best.entries())
       .filter(([, d]) => d < 0.65)
       .map(([photo_id, d]) => ({ photo_id, confidence: distanceToConfidence(d) }));
+
+    // Count total photos scanned in this event
+    const { count: totalScanned } = await supabaseAdmin
+      .from("photos")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", ev.id)
+      .eq("status", "published");
 
     const token = crypto.randomUUID().replace(/-/g, "");
     const { data: session, error: sErr } = await supabaseAdmin
@@ -76,7 +102,12 @@ export const matchGuestSelfie = createServerFn({ method: "POST" })
         })),
       );
     }
-    return { token: session.token, matchCount: matches.length };
+    return {
+      token: session.token,
+      matchCount: matches.length,
+      peopleDetected: data.embeddings.length,
+      totalScanned: totalScanned ?? 0,
+    };
   });
 
 const tokenSchema = z.string().min(16).max(64).regex(/^[a-zA-Z0-9]+$/);
@@ -110,7 +141,7 @@ export const getGuestGallery = createServerFn({ method: "POST" })
         .eq("status", "published"),
       supabaseAdmin
         .from("guest_matches")
-        .select("photo_id, confidence, photos(id,thumb_path,preview_path,storage_path)")
+        .select("photo_id, confidence, photos(id,thumb_path,preview_path,storage_path,quality_score)")
         .eq("session_id", sess.id)
         .order("confidence", { ascending: false }),
       supabaseAdmin.from("favorites").select("photo_id").eq("session_id", sess.id),
