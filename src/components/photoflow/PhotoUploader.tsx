@@ -43,20 +43,28 @@ export function PhotoUploader({ eventId, onUploaded }: Props) {
         const previewPath = `${base}/preview.jpg`;
         const thumbPath = `${base}/thumb.jpg`;
 
-        await Promise.all([
+        const uploads = await Promise.all([
           supabase.storage.from("photos").upload(originalPath, originalBlob, {
             contentType: "image/jpeg",
             cacheControl: "31536000",
+            upsert: true,
           }),
           supabase.storage.from("photos").upload(previewPath, previewBlob, {
             contentType: "image/jpeg",
             cacheControl: "31536000",
+            upsert: true,
           }),
           supabase.storage.from("photos").upload(thumbPath, thumbBlob, {
             contentType: "image/jpeg",
             cacheControl: "31536000",
+            upsert: true,
           }),
         ]);
+        const upErr = uploads.find((u) => u.error)?.error;
+        if (upErr) {
+          console.error("Storage upload failed", upErr);
+          throw new Error(upErr.message);
+        }
 
         // Detect faces on preview-sized image
         const img = await loadImageFromBlob(previewBlob);
