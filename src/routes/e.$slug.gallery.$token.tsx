@@ -2,9 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Heart, Download, Share2, X, ArrowLeft, AlertCircle, Camera, Lightbulb, RefreshCw } from "lucide-react";
+import { Heart, Download, Share2, X, ArrowLeft, AlertCircle, Camera, Lightbulb, RefreshCw, CheckSquare, Square } from "lucide-react";
 import { publicPhotoUrl } from "@/lib/storage-url";
 import { getGuestGallery, toggleGuestFavorite } from "@/lib/guest.functions";
+import JSZip from "jszip";
 
 type Match = {
   photo_id: string;
@@ -35,6 +36,9 @@ function GuestGallery() {
   const [viewer, setViewer] = useState<string | null>(null);
   const [totalEventPhotos, setTotalEventPhotos] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
+  const [zipProgress, setZipProgress] = useState<{ current: number; total: number; phase: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -108,6 +112,92 @@ function GuestGallery() {
     }
   }
 
+  function filenameFromPath(path: string, fallback: string): string {
+    const last = path.split("/").pop() || fallback;
+    return last.replace(/[^\w.\-]+/g, "_");
+  }
+
+  async function downloadSingle(path: string) {
+    const url = publicPhotoUrl(path);
+    const name = filenameFromPath(path, "photo.jpg");
+    try {
+      toast.loading("Preparing download…", { id: "dl" });
+      const res = await fetch(url, { mode: "cors" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      triggerBlobDownload(blob, name);
+      toast.success("Download started", { id: "dl" });
+    } catch (e) {
+      console.error(e);
+      toast.error("Unable to download image. Please try again.", { id: "dl" });
+    }
+  }
+
+  function triggerBlobDownload(blob: Blob, filename: string) {
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  }
+
+  function safeEventName(): string {
+    return (event?.name ?? "photos").replace(/[^\w\-]+/g, "_");
+  }
+
+  async function downloadZip(items: Match[], zipLabel: string) {
+    if (!event?.downloads_enabled) {
+      toast.error("Downloads are disabled for this event");
+      return;
+    }
+    const photos = items.map((m) => m.photos).filter((p): p is NonNullable<Match["photos"]> => !!p);
+    if (photos.length === 0) {
+      toast.error("Nothing to download");
+      return;
+    }
+    const zip = new JSZip();
+    setZipProgress({ current: 0, total: photos.length, phase: "Preparing download…" });
+    let done = 0;
+    let failed = 0;
+    try {
+      // Sequential fetch keeps memory + bandwidth reasonable on mobile
+      for (const p of photos) {
+        try {
+          const res = await fetch(publicPhotoUrl(p.storage_path), { mode: "cors" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          zip.file(filenameFromPath(p.storage_path, `${p.id}.jpg`), blob);
+        } catch (e) {
+          console.error("photo fetch failed", p.storage_path, e);
+          failed++;
+        }
+        done++;
+        setZipProgress({ current: done, total: photos.length, phase: `Downloading ${done}/${photos.length}…` });
+      }
+      setZipProgress({ current: done, total: photos.length, phase: "Generating ZIP archive…" });
+      const blob = await zip.generateAsync({ type: "blob", compression: "STORE" }, (meta) => {
+        setZipProgress({ current: done, total: photos.length, phase: `Generating ZIP ${Math.round(meta.percent)}%` });
+      });
+      triggerBlobDownload(blob, `${safeEventName()}_${zipLabel}.zip`);
+      if (failed > 0) toast.warning(`Download ready (${failed} photos could not be included)`);
+      else toast.success("Download complete");
+    } catch (e) {
+      console.error(e);
+      toast.error("ZIP generation failed. Please try again.");
+    } finally {
+      setZipProgress(null);
+    }
+  }
+
+  function toggleSelect(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  }
+
   if (!event) {
     if (loadError) {
       return (
@@ -148,6 +238,33 @@ function GuestGallery() {
             </button>
           ))}
         </div>
+        {event.downloads_enabled && (
+          <div className="container mx-auto px-4 pb-3 flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant={selectMode ? "default" : "secondary"}
+              onClick={() => { setSelectMode((v) => !v); setSelected(new Set()); }}
+            >
+              {selectMode ? <CheckSquare className="h-4 w-4 mr-1" /> : <Square className="h-4 w-4 mr-1" />}
+              {selectMode ? `Selected ${selected.size}` : "Select"}
+            </Button>
+            {selectMode && selected.size > 0 && (
+              <Button size="sm" onClick={() => downloadZip(matches.filter((m) => selected.has(m.photo_id)), "Selected")}>
+                <Download className="h-4 w-4 mr-1" /> Download selected ({selected.size})
+              </Button>
+            )}
+            {!selectMode && counts.favorites > 0 && (
+              <Button size="sm" variant="secondary" onClick={() => downloadZip(matches.filter((m) => favorites.has(m.photo_id)), "Favourites")}>
+                <Download className="h-4 w-4 mr-1" /> Download favourites ({counts.favorites})
+              </Button>
+            )}
+            {!selectMode && counts.all > 0 && (
+              <Button size="sm" variant="secondary" onClick={() => downloadZip(matches, "AllPhotos")}>
+                <Download className="h-4 w-4 mr-1" /> Download all ({counts.all})
+              </Button>
+            )}
+          </div>
+        )}
       </header>
 
       <main className="container mx-auto px-4 py-6">
@@ -167,7 +284,11 @@ function GuestGallery() {
         ) : (
           <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {displayed.map((m) => m.photos && (
-              <button key={m.photo_id} onClick={() => setViewer(m.photo_id)} className="relative aspect-square rounded-lg overflow-hidden bg-muted group">
+              <button
+                key={m.photo_id}
+                onClick={() => selectMode ? toggleSelect(m.photo_id) : setViewer(m.photo_id)}
+                className={`relative aspect-square rounded-lg overflow-hidden bg-muted group ${selectMode && selected.has(m.photo_id) ? "ring-2 ring-primary" : ""}`}
+              >
                 <img src={publicPhotoUrl(m.photos.thumb_path ?? m.photos.storage_path)} loading="lazy" alt="" className="w-full h-full object-cover transition group-hover:scale-105" />
                 {favorites.has(m.photo_id) && (
                   <Heart className="absolute top-2 right-2 h-5 w-5 fill-primary text-primary drop-shadow" />
@@ -175,11 +296,28 @@ function GuestGallery() {
                 {m.confidence < 0.7 && (
                   <span className="absolute bottom-2 left-2 text-[10px] bg-black/60 text-white px-2 py-0.5 rounded">Maybe</span>
                 )}
+                {selectMode && (
+                  <span className={`absolute top-2 left-2 h-6 w-6 rounded-md flex items-center justify-center ${selected.has(m.photo_id) ? "bg-primary text-primary-foreground" : "bg-black/50 text-white"}`}>
+                    {selected.has(m.photo_id) ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                  </span>
+                )}
               </button>
             ))}
           </div>
         )}
       </main>
+
+      {zipProgress && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card border border-border rounded-xl shadow-lg px-4 py-3 w-[90%] max-w-sm">
+          <p className="text-sm font-medium">{zipProgress.phase}</p>
+          <div className="mt-2 h-2 bg-secondary rounded overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{ width: `${zipProgress.total ? Math.round((zipProgress.current / zipProgress.total) * 100) : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {viewerMatch && viewerMatch.photos && (
         <div className="fixed inset-0 z-50 bg-black/95 flex flex-col" onClick={() => setViewer(null)}>
@@ -191,9 +329,13 @@ function GuestGallery() {
               <Share2 className="h-5 w-5 text-white" />
             </Button>
             {event.downloads_enabled && (
-              <a href={publicPhotoUrl(viewerMatch.photos.storage_path)} download target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                <Button size="icon" variant="ghost"><Download className="h-5 w-5 text-white" /></Button>
-              </a>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={(e) => { e.stopPropagation(); downloadSingle(viewerMatch.photos!.storage_path); }}
+              >
+                <Download className="h-5 w-5 text-white" />
+              </Button>
             )}
             <Button size="icon" variant="ghost" onClick={() => setViewer(null)}>
               <X className="h-5 w-5 text-white" />
